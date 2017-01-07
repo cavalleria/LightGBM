@@ -2,6 +2,23 @@ language: cpp
 sudo: required
 dist: trusty
 
+
+env:
+  - BOOTSTRAP_LATEX="1"
+  - BOOTSTRAP_LATEX="1" R_CHECK_REVDEP="1" # checks reverse depends
+
+# Create a build matrix that will test a regular check
+# and also check the reverse dependencies
+matrix:
+  # http://docs.travis-ci.com/user/build-configuration/#Fast-finishing
+  # allows the build to "pass" when the non-failure-able builds are done
+  fast_finish: true
+
+  # http://docs.travis-ci.com/user/build-configuration/#Rows-That-are-Allowed-To-Fail
+  allow_failures:
+    # allows the revdep build to fail and still "pass" within travis
+    - env: BOOTSTRAP_LATEX="1" R_CHECK_REVDEP="1"
+
 before_install:
 - test -n $CC  && unset CC
 - test -n $CXX && unset CXX
@@ -11,11 +28,15 @@ before_install:
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
+- curl -OL http://raw.github.com/craigcitro/r-travis/master/scripts/travis-tool.sh
+- chmod 755 ./travis-tool.sh
+- ./travis-tool.sh bootstrap
 
 install:
 - sudo apt-get install -y libopenmpi-dev openmpi-bin build-essential
 - conda install --yes atlas numpy scipy scikit-learn
 - pip install pep8
+- ./travis-tool.sh install_deps
 
 
 script:
@@ -29,6 +50,10 @@ script:
 - cd $TRAVIS_BUILD_DIR/tests/c_api_test && python test.py
 - cd $TRAVIS_BUILD_DIR/python-package && python setup.py install
 - cd $TRAVIS_BUILD_DIR/tests/python_package_test && python test_basic.py && python test_engine.py && python test_sklearn.py
+- ./travis-tool.sh run_tests
+
+after_failure:
+  - ./travis-tool.sh dump_logs
 
 notifications:
   email: false
